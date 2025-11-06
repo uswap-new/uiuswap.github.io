@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Swap Hive</title>
+    <style>
+        body {
+            font-family: monospace;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 5px;
+        }
+        .pass {
+            background: #2d5016;
+        }
+        .fail {
+            background: #5d1616;
+        }
+    </style>
+</head>
+<body>
+    <h1>Module Load Test</h1>
+    <div id="results"></div>
+    
+    <!-- Libraries -->
+    <script src="./libs/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <script src="./libs/@hiveio/hive-js/dist/hive.min.js"></script>
+    <script src="./libs/axios/dist/axios.min.js"></script>
+    <script src="./libs/sscjs@latest/dist/ssc.min.js"></script>
+    
+    <!-- Application Modules -->
+    <script src="js/config.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/wallet.js"></script>
+    <script src="js/market.js"></script>
+    <script src="js/swap.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/main.js"></script>
+    
+    <script>
+        const results = document.getElementById('results');
+        
+        function test(name, condition) {
+            const div = document.createElement('div');
+            div.className = 'test-result ' + (condition ? 'pass' : 'fail');
+            div.textContent = (condition ? '✓' : '✗') + ' ' + name;
+            results.appendChild(div);
+        }
+        
+        // Test library loading
+        test('jQuery loaded', typeof $ !== 'undefined');
+        test('Hive.js loaded', typeof hive !== 'undefined');
+        test('Axios loaded', typeof axios !== 'undefined');
+        test('SSC loaded', typeof SSC !== 'undefined');
+        
+        // Test module loading
+        test('CONFIG defined', typeof CONFIG !== 'undefined');
+        test('APIManager defined', typeof APIManager !== 'undefined');
+        test('WalletManager defined', typeof WalletManager !== 'undefined');
+        test('MarketManager defined', typeof MarketManager !== 'undefined');
+        test('SwapManager defined', typeof SwapManager !== 'undefined');
+        test('UIManager defined', typeof UIManager !== 'undefined');
+        
+        // Test module methods
+        test('CONFIG has HIVE_RPC_NODES', Array.isArray(CONFIG.HIVE_RPC_NODES));
+        test('APIManager has initialize', typeof APIManager.initialize === 'function');
+        test('WalletManager has loadBalance', typeof WalletManager.loadBalance === 'function');
+        test('MarketManager has initialize', typeof MarketManager.initialize === 'function');
+        test('SwapManager has executeSwap', typeof SwapManager.executeSwap === 'function');
+        test('UIManager has showLoading', typeof UIManager.showLoading === 'function');
+        
+        console.log('All tests complete');
+    </script>
+</body>
+</html>
