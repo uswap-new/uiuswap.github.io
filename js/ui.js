@@ -246,10 +246,10 @@ const UIManager = (function() {
                     ${swap.txIdSent.substring(0, 8)}...
                 </a>` : '-';
 
-            const txIdReceived = swap.txIdReceived && swap.txIdReceived !== 'uswap-transfer' && swap.txIdReceived !== 'uswap-refund' ? 
+            const txIdReceived = swap.txIdReceived ? 
                 `<a href="https://hivehub.dev/tx/${swap.txIdReceived}" target="_blank" style="color: var(--accent-primary); text-decoration: none;">
                     ${swap.txIdReceived.substring(0, 8)}...
-                </a>` : (swap.txIdReceived ? swap.txIdReceived : '-');
+                </a>` : '-';
 
             // Format amounts to 3 decimals
             const formatAmount = (amount) => {

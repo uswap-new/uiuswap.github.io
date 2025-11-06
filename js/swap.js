@@ -41,6 +41,7 @@ const SwapManager = (function() {
                 const op = item[1].op;
                 const transferData = op[1];
                 const memo = transferData.memo || '';
+                const trxId = item[1].trx_id;
                 
                 if (memo.includes(originalTxId)) {
                     // Parse memo to extract swap details
@@ -50,6 +51,7 @@ const SwapManager = (function() {
                     return {
                         found: true,
                         amount: transferData.amount,
+                        txId: trxId,
                         swappedQty: qtyMatch ? qtyMatch[1] : null,
                         swappedPrice: priceMatch ? priceMatch[1] : null,
                         memo: memo
@@ -82,6 +84,7 @@ const SwapManager = (function() {
                 const item = customJsonOps[i];
                 const op = item[1].op;
                 const opData = op[1];
+                const trxId = item[1].trx_id;
                 
                 try {
                     const json = JSON.parse(opData.json);
@@ -103,6 +106,7 @@ const SwapManager = (function() {
                             return {
                                 found: true,
                                 amount: `${payload.quantity} SWAP.HIVE`,
+                                txId: trxId,
                                 swappedQty: qtyMatch ? qtyMatch[1] : null,
                                 swappedPrice: priceMatch ? priceMatch[1] : null,
                                 memo: memo
@@ -215,8 +219,26 @@ const SwapManager = (function() {
         let history = JSON.parse(localStorage.getItem('swapHistory') || '[]');
         const userHistory = history.filter(h => h.username === username);
         
-        // Check status for pending swaps
+        // Check status for pending swaps AND re-check completed swaps with old data
         for (let swap of userHistory) {
+            // Re-check completed swaps that have 'uswap-transfer' or 'uswap-refund' placeholder
+            if ((swap.status === 'completed' || swap.status === 'refunded') && 
+                (swap.txIdReceived === 'uswap-transfer' || swap.txIdReceived === 'uswap-refund')) {
+                // Re-fetch to get actual transaction ID
+                const toToken = swap.toToken;
+                let result;
+                
+                if (toToken === "HIVE") {
+                    result = await checkUswapHiveTransfers(swap.txIdSent, username);
+                } else {
+                    result = await checkUswapEngineTransfers(swap.txIdSent, username);
+                }
+                
+                if (result.found) {
+                    swap.txIdReceived = result.txId;
+                }
+            }
+            
             if (swap.status === 'pending') {
                 // First, check if swap completed or refunded by checking uswap history
                 const toToken = swap.toToken;
@@ -231,7 +253,7 @@ const SwapManager = (function() {
                 if (result.found) {
                     swap.status = 'completed';
                     swap.amountReceived = result.amount;
-                    swap.txIdReceived = 'uswap-transfer';
+                    swap.txIdReceived = result.txId;
                     swap.swappedQty = result.swappedQty;
                     swap.swappedPrice = result.swappedPrice;
                     continue;
@@ -243,7 +265,7 @@ const SwapManager = (function() {
                     if (refund.found) {
                         swap.status = 'refunded';
                         swap.amountReceived = refund.amount;
-                        swap.txIdReceived = 'uswap-refund';
+                        swap.txIdReceived = refund.txId;
                         continue;
                     }
                 } else {
@@ -251,7 +273,7 @@ const SwapManager = (function() {
                     if (refund.found) {
                         swap.status = 'refunded';
                         swap.amountReceived = refund.amount;
-                        swap.txIdReceived = 'uswap-refund';
+                        swap.txIdReceived = refund.txId;
                         continue;
                     }
                 }
