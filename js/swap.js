@@ -188,7 +188,7 @@ const SwapManager = (function() {
     async function verifyTransactionExists(txId, fromToken) {
         try {
             if (fromToken === "HIVE") {
-                // For HIVE transactions, use hive.api.getTransaction
+                // For HIVE transactions, verify on Hive blockchain
                 try {
                     const tx = await hive.api.getTransactionAsync(txId);
                     return tx !== null && tx !== undefined;
@@ -196,10 +196,17 @@ const SwapManager = (function() {
                     return false;
                 }
             } else {
-                // For SWAP.HIVE (Hive Engine), use ssc to get transaction
+                // For SWAP.HIVE (custom_json), verify it was processed by Hive Engine side chain
                 try {
-                    const tx = await ssc.getTransactionInfo(txId);
-                    return tx !== null && tx !== undefined;
+                    const ssc = APIManager.getSSC();
+                    if (!ssc) {
+                        return false;
+                    }
+                    
+                    const engineTx = await ssc.getTransactionInfo(txId);
+                    // Hive Engine returns an object with blockNumber, transactionId, etc if found
+                    // Returns null or undefined if not found
+                    return engineTx !== null && engineTx !== undefined && engineTx.transactionId;
                 } catch (error) {
                     return false;
                 }
@@ -278,12 +285,21 @@ const SwapManager = (function() {
                     }
                 }
                 
-                // Not completed and not refunded, verify if original transaction exists
-                const txExists = await verifyTransactionExists(swap.txIdSent, swap.fromToken);
+                // Not completed and not refunded
+                // Only check if transaction exists if it's been more than 2 minutes
+                const now = Date.now();
+                const swapAge = now - swap.timestamp; // in milliseconds
+                const twoMinutes = 2 * 60 * 1000; // 2 minutes in ms
                 
-                if (!txExists) {
-                    swap.status = 'not-sent';
+                // If swap is older than 2 minutes and still pending, verify transaction exists
+                if (swapAge > twoMinutes) {
+                    const txExists = await verifyTransactionExists(swap.txIdSent, swap.fromToken);
+                    
+                    if (!txExists) {
+                        swap.status = 'not-sent';
+                    }
                 }
+                // If less than 2 minutes old, keep as pending (still processing)
             }
         }
         
