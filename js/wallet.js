@@ -12,7 +12,8 @@ const WalletManager = (function() {
     
     // Cache for balance refresh
     let lastFetch = null;
-    const CACHE_DURATION = 10000; // 10 seconds
+    const CACHE_DURATION = 30000; // 30 seconds (increased from 10)
+    let loadBalanceTimeout = null; // Debounce timer
 
     /**
      * Query Hive Engine with Promise wrapper
@@ -70,8 +71,9 @@ const WalletManager = (function() {
 
     /**
      * Load user balances from Hive and Hive Engine
+     * With debouncing to prevent rapid API calls
      */
-    async function loadBalance(username) {
+    async function loadBalance(username, forceRefresh = false) {
         // Validate username
         const sanitized = Utils.sanitizeUsername(username);
         if (!Utils.isValidUsername(sanitized)) {
@@ -79,46 +81,60 @@ const WalletManager = (function() {
             return null;
         }
 
-        // Check cache
+        // Check cache (skip if force refresh)
         const now = Date.now();
-        if (currentUser === sanitized && lastFetch && (now - lastFetch) < CACHE_DURATION) {
+        if (!forceRefresh && currentUser === sanitized && lastFetch && (now - lastFetch) < CACHE_DURATION) {
+            console.log(`⚡ Using cached balance (${Math.floor((CACHE_DURATION - (now - lastFetch)) / 1000)}s remaining)`);
             return balances;
         }
 
-        try {
-            UIManager.showLoading("Loading balances...");
-            
-            // Fetch both balances in parallel
-            const [hiveBalance, swapHiveBalance] = await Promise.all([
-                fetchHiveBalance(sanitized),
-                fetchSwapHiveBalance(sanitized)
-            ]);
-
-            // Update state
-            balances.HIVE = hiveBalance;
-            balances["SWAP.HIVE"] = swapHiveBalance;
-            currentUser = sanitized;
-            lastFetch = now;
-
-            // Update UI
-            UIManager.updateBalance("hive", hiveBalance);
-            UIManager.updateBalance("swaphive", swapHiveBalance);
-            UIManager.hideLoading();
-            
-            // Trigger swap validation to enable/disable button based on current state
-            SwapManager.validateButton();
-            
-            // Update swap history
-            UIManager.updateSwapHistory();
-
-            return balances;
-
-        } catch (error) {
-            const handled = Utils.handleError(error, 'WalletManager.loadBalance');
-            UIManager.hideLoading();
-            UIManager.showError(handled.message);
-            return null;
+        // Debounce: Clear previous timeout
+        if (loadBalanceTimeout) {
+            clearTimeout(loadBalanceTimeout);
         }
+
+        // Return promise that resolves after debounce
+        return new Promise((resolve) => {
+            loadBalanceTimeout = setTimeout(async () => {
+                try {
+                    UIManager.showLoading("Loading balances...");
+                    
+                    console.log(`🔄 Fetching fresh balance for @${sanitized}...`);
+                    
+                    // Fetch both balances in parallel
+                    const [hiveBalance, swapHiveBalance] = await Promise.all([
+                        fetchHiveBalance(sanitized),
+                        fetchSwapHiveBalance(sanitized)
+                    ]);
+
+                    // Update state
+                    balances.HIVE = hiveBalance;
+                    balances["SWAP.HIVE"] = swapHiveBalance;
+                    currentUser = sanitized;
+                    lastFetch = Date.now();
+
+                    // Update UI
+                    UIManager.updateBalance("hive", hiveBalance);
+                    UIManager.updateBalance("swaphive", swapHiveBalance);
+                    UIManager.hideLoading();
+                    
+                    // Trigger swap validation to enable/disable button based on current state
+                    SwapManager.validateButton();
+                    
+                    // Update swap history
+                    UIManager.updateSwapHistory();
+
+                    console.log(`✅ Balance loaded: HIVE=${hiveBalance}, SWAP.HIVE=${swapHiveBalance}`);
+                    resolve(balances);
+
+                } catch (error) {
+                    const handled = Utils.handleError(error, 'WalletManager.loadBalance');
+                    UIManager.hideLoading();
+                    UIManager.showError(handled.message);
+                    resolve(null);
+                }
+            }, 500); // 500ms debounce delay
+        });
     }
 
     /**
@@ -155,15 +171,16 @@ const WalletManager = (function() {
     }
     
     /**
-     * Refresh balance (force reload)
+     * Refresh balance (force reload, bypass cache)
      */
     async function refreshBalance() {
         if (!currentUser) {
             UIManager.showError("No user loaded");
             return null;
         }
+        console.log("🔄 Force refreshing balance...");
         lastFetch = null; // Clear cache
-        return await loadBalance(currentUser);
+        return await loadBalance(currentUser, true); // Force refresh
     }
     
     /**

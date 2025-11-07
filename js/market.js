@@ -19,7 +19,13 @@ const MarketManager = (function() {
     // Price cache
     let priceCache = {
         lastFetch: null,
-        cacheDuration: 15000 // 15 seconds
+        cacheDuration: 60000 // 60 seconds (increased from 15)
+    };
+    
+    // Liquidity cache
+    let liquidityCache = {
+        lastFetch: null,
+        cacheDuration: 45000 // 45 seconds
     };
 
     /**
@@ -179,10 +185,21 @@ const MarketManager = (function() {
     }
 
     /**
-     * Fetch liquidity pool balances
+     * Fetch liquidity pool balances (with caching)
      */
-    async function fetchLiquidity() {
+    async function fetchLiquidity(forceRefresh = false) {
+        const now = Date.now();
+        
+        // Check cache
+        if (!forceRefresh && liquidityCache.lastFetch && 
+            (now - liquidityCache.lastFetch) < liquidityCache.cacheDuration) {
+            console.log(`⚡ Using cached liquidity (${Math.floor((liquidityCache.cacheDuration - (now - liquidityCache.lastFetch)) / 1000)}s remaining)`);
+            return liquidity;
+        }
+        
         try {
+            console.log("🔄 Fetching fresh liquidity data...");
+            
             // Fetch both in parallel
             const [accounts, tokens] = await Promise.all([
                 Utils.retry(() => 
@@ -212,11 +229,14 @@ const MarketManager = (function() {
                 UIManager.updateLiquidity("swaphiveliquidity", liquidity.swapHive);
             }
 
-            console.log("Liquidity updated:", liquidity);
+            liquidityCache.lastFetch = now;
+            console.log("✅ Liquidity updated:", liquidity);
         } catch (error) {
             const handled = Utils.handleError(error, 'MarketManager.fetchLiquidity');
             console.error(handled.message);
         }
+        
+        return liquidity;
     }
 
     /**

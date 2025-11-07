@@ -286,20 +286,21 @@ const SwapManager = (function() {
                 }
                 
                 // Not completed and not refunded
-                // Only check if transaction exists if it's been more than 2 minutes
+                // Give time for blockchain/side chain to process before checking existence
                 const now = Date.now();
                 const swapAge = now - swap.timestamp; // in milliseconds
-                const twoMinutes = 2 * 60 * 1000; // 2 minutes in ms
+                const minimumWaitTime = 30 * 1000; // 30 seconds
+                const maximumWaitTime = 10 * 60 * 1000; // 10 minutes
                 
-                // If swap is older than 2 minutes and still pending, verify transaction exists
-                if (swapAge > twoMinutes) {
+                // Only check if transaction exists after minimum wait time
+                if (swapAge > minimumWaitTime && swapAge < maximumWaitTime) {
                     const txExists = await verifyTransactionExists(swap.txIdSent, swap.fromToken);
                     
                     if (!txExists) {
                         swap.status = 'not-sent';
                     }
                 }
-                // If less than 2 minutes old, keep as pending (still processing)
+                // If less than 30 seconds or more than 10 minutes, keep as pending
             }
         }
         
