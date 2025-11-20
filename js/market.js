@@ -202,9 +202,8 @@ const MarketManager = (function() {
             
             // Fetch both in parallel
             const [accounts, tokens] = await Promise.all([
-                Utils.retry(() => 
-                    hive.api.getAccountsAsync([CONFIG.BRIDGE_USER]),
-                    2, 1000
+                APIManager.tryWithFailover(() => 
+                    hive.api.getAccountsAsync([CONFIG.BRIDGE_USER])
                 ),
                 Utils.retry(() =>
                     queryHiveEngine('tokens', 'balances', { 

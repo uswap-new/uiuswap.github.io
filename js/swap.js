@@ -27,7 +27,9 @@ const SwapManager = (function() {
      */
     async function checkUswapHiveTransfers(originalTxId, username) {
         try {
-            const history = await hive.api.getAccountHistoryAsync(CONFIG.BRIDGE_USER, -1, 100);
+            const history = await APIManager.tryWithFailover(() => 
+                hive.api.getAccountHistoryAsync(CONFIG.BRIDGE_USER, -1, 100)
+            );
                         
             // Filter for direct transfers to our user
             // Structure: [index, {trx_id, block, op: [type, data], timestamp, ...}]
@@ -71,7 +73,9 @@ const SwapManager = (function() {
      */
     async function checkUswapEngineTransfers(originalTxId, username) {
         try {
-            const history = await hive.api.getAccountHistoryAsync(CONFIG.BRIDGE_USER, -1, 100);
+            const history = await APIManager.tryWithFailover(() =>
+                hive.api.getAccountHistoryAsync(CONFIG.BRIDGE_USER, -1, 100)
+            );
             
             // Filter for custom_json operations
             // Structure: [index, {trx_id, block, op: [type, data], timestamp, ...}]
@@ -190,7 +194,9 @@ const SwapManager = (function() {
             if (fromToken === "HIVE") {
                 // For HIVE transactions, verify on Hive blockchain
                 try {
-                    const tx = await hive.api.getTransactionAsync(txId);
+                    const tx = await APIManager.tryWithFailover(() =>
+                        hive.api.getTransactionAsync(txId)
+                    );
                     return tx !== null && tx !== undefined;
                 } catch (error) {
                     return false;

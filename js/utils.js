@@ -231,11 +231,11 @@ const Utils = (function() {
     /**
      * Timeout wrapper for promises
      */
-    function withTimeout(promise, timeoutMs = 10000) {
+    function withTimeout(promise, timeoutMs = 8000) {
         return Promise.race([
             promise,
             new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Request timeout')), timeoutMs)
+                setTimeout(() => reject(new Error(`Request timeout after ${timeoutMs}ms`)), timeoutMs)
             )
         ]);
     }

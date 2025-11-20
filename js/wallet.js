@@ -34,12 +34,11 @@ const WalletManager = (function() {
     }
 
     /**
-     * Fetch HIVE balance with retry
+     * Fetch HIVE balance with retry and node failover
      */
     async function fetchHiveBalance(username) {
-        const accounts = await Utils.retry(() => 
-            hive.api.getAccountsAsync([username]),
-            3, 1000
+        const accounts = await APIManager.tryWithFailover(
+            () => hive.api.getAccountsAsync([username])
         );
 
         if (!accounts || accounts.length === 0) {

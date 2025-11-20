@@ -30,7 +30,14 @@ const APIManager = (function() {
     async function initializeHiveAPI() {
         selectedHiveNode = await getSelectedEndpoint();
         console.log("SELECTED HIVE API NODE:", selectedHiveNode);
-        hive.api.setOptions({ url: selectedHiveNode });
+        
+        // Set options with timeout
+        hive.api.setOptions({ 
+            url: selectedHiveNode,
+            timeout: 8000, // 8 second timeout
+            failover_threshold: 3,
+            rebroadcast_threshold: 3
+        });
         
         const button = document.getElementById("popup-button-hive");
         if (button) {
@@ -321,10 +328,56 @@ const APIManager = (function() {
             setupHiveNodeSelector();
             setupEngineNodeSelector();
             
-            console.log("API Manager initialized successfully");
+            console.log("✅ API Manager initialized successfully");
+            console.log("📡 Hive Node:", selectedHiveNode);
+            console.log("🔗 Engine Node:", selectedEngineNode);
         } catch (error) {
-            console.error("Error initializing API Manager:", error);
+            console.error("❌ Error initializing API Manager:", error);
+            throw error;
         }
+    }
+
+    /**
+     * Try API call with automatic node failover
+     */
+    async function tryWithFailover(apiFn, maxAttempts = 3) {
+        const availableNodes = CONFIG.HIVE_RPC_NODES.filter(node => node !== selectedHiveNode);
+        let currentNode = selectedHiveNode;
+        let lastError;
+        
+        for (let attempt = 0; attempt < maxAttempts; attempt++) {
+            try {
+                // Set current node
+                hive.api.setOptions({ 
+                    url: currentNode,
+                    timeout: 8000
+                });
+                
+                // Try the API call with timeout
+                const result = await Utils.withTimeout(apiFn(), 10000);
+                
+                // If successful and we switched nodes, save the new node
+                if (currentNode !== selectedHiveNode) {
+                    console.log(`✅ Switched to working node: ${currentNode}`);
+                    selectedHiveNode = currentNode;
+                    localStorage.setItem('selectedEndpoint', currentNode);
+                }
+                
+                return result;
+            } catch (error) {
+                lastError = error;
+                console.warn(`⚠️ Node ${currentNode} failed (attempt ${attempt + 1}/${maxAttempts}):`, error.message);
+                
+                // Try next node if available
+                if (attempt < maxAttempts - 1 && availableNodes.length > 0) {
+                    currentNode = availableNodes[attempt % availableNodes.length];
+                    console.log(`🔄 Switching to backup node: ${currentNode}`);
+                    await Utils.sleep(500); // Brief delay before retry
+                }
+            }
+        }
+        
+        throw lastError;
     }
 
     /**
@@ -341,6 +394,7 @@ const APIManager = (function() {
         initializeHiveAPI,
         initializeEngineAPI,
         getSelectedEndpoint,
-        getSelectedEngEndpoint
+        getSelectedEngEndpoint,
+        tryWithFailover
     };
 })();
